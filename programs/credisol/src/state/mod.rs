@@ -1,3 +1,7 @@
-pub mod accounts;
+pub mod bank;
+pub mod group;
+pub mod user_deposit;
 
-pub use accounts::*;
+pub use bank::*;
+pub use group::*;
+pub use user_deposit::*;

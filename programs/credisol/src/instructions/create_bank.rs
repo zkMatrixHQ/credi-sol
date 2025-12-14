@@ -1,14 +1,15 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount, Token};
+use crate::constants::ANCHOR_DISCRIMINATOR;
 use crate::error::LendingError;
 use crate::state::{Bank, Group};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(Accounts)]
 pub struct CreateBank<'info> {
     #[account(
         init,
         payer = admin,
-        space = Bank::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + Bank::INIT_SPACE,
         seeds = [b"bank", mint.key().as_ref()],
         bump
     )]
@@ -23,7 +24,8 @@ pub struct CreateBank<'info> {
         init,
         payer = admin,
         token::mint = mint,
-        token::authority = bank
+        token::authority = bank,
+        constraint = vault.mint == mint.key() @ LendingError::Unauthorized
     )]
     pub vault: Account<'info, TokenAccount>,
 
@@ -34,16 +36,18 @@ pub struct CreateBank<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_bank_instruction(ctx: Context<CreateBank>) -> Result<()> {
-    require!(
-        ctx.accounts.group.admin == ctx.accounts.admin.key(),
-        LendingError::Unauthorized
-    );
+impl<'info> CreateBank<'info> {
+    pub fn create_bank_ix(&mut self) -> Result<()> {
+        require!(
+            self.group.admin == self.admin.key(),
+            LendingError::Unauthorized
+        );
 
-    let bank = &mut ctx.accounts.bank;
-    bank.mint = ctx.accounts.mint.key();
-    bank.vault = ctx.accounts.vault.key();
-    bank.total_deposits = 0;
-
-    Ok(())
+        self.bank.set_inner(Bank {
+            mint: self.mint.key(),
+            vault: self.vault.key(),
+            total_deposits: 0,
+        });
+        Ok(())
+    }
 }
